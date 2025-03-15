@@ -119,8 +119,8 @@ with col2:
         # Add assistant message to chat history
         st.session_state.chat_history.append({"role": "assistant", "content": response_text})
         
-        # Scroll to bottom (this is a workaround, not perfect)
-        st.experimental_rerun()
+        # Remove the experimental_rerun() call which is causing the error
+        # The chat will update automatically without needing to rerun
 
 # Footer
 st.markdown("---")
