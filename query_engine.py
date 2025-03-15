@@ -42,12 +42,12 @@ class Chatbot:
         query = """
         MATCH (c:TextChunk)
         WHERE toLower(c.text) CONTAINS toLower($query_text)
-        RETURN c.text AS text
+        RETURN c.text
         """
         try:
             with self.driver.session() as session:
-                results = session.run(query, {"query_text": query_text})
-                return [record["text"] for record in results]
+                results = session.run(query, query_text= query_text})
+                return [record["c.text"] for record in results]
         except Exception as e:
             print(f"⚠️ Neo4j Text Query Error: {e}")
             return []
