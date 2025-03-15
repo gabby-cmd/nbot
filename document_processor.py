@@ -22,10 +22,13 @@ class DocumentProcessor:
     def _extract_text_from_pdf(self, file_path):
         """Extract text from a PDF file"""
         text = ""
-        with open(file_path, "rb") as f:
-            reader = PyPDF2.PdfReader(f)
-            for page in reader.pages:
-                text += page.extract_text() + "\n"
+        try:
+            with open(file_path, "rb") as f:
+                reader = PyPDF2.PdfReader(f)
+                for page in reader.pages:
+                    text += page.extract_text() + "\n"
+        except Exception as e:
+            print(f"🚨 Error reading PDF: {e}")
         return text
 
     def _chunk_text(self, text, chunk_size=1000, overlap=200):
