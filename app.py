@@ -54,9 +54,13 @@ if st.button("Send"):
             full_response = ""
 
             # ✅ FIX: Directly append text chunks (no `.text` attribute)
-            for chunk in response_stream:
-                if isinstance(chunk, str):  # ✅ Ensure chunk is a string
-                    full_response += chunk  
-                    response_placeholder.write(full_response)  # ✅ Update UI dynamically
-                else:
-                    print(f"Unexpected chunk format: {chunk}")
+         for chunk in response_stream:
+    if isinstance(chunk, str):  # ✅ Check if chunk is a string
+        full_response += chunk  
+    elif hasattr(chunk, "text"):  # ✅ If chunk is an object, extract its text
+        full_response += chunk.text  
+    else:
+        print(f"⚠️ Unexpected chunk format: {chunk}")  # Debugging
+
+    response_placeholder.write(full_response)  # ✅ Update UI dynamically
+
