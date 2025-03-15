@@ -1,5 +1,5 @@
 import streamlit as st
-import os  # ✅ Fix: Import os module
+import os
 from query_engine import Chatbot
 from document_processor import DocumentProcessor
 
@@ -43,17 +43,3 @@ if uploaded_file:
 st.header("🤖 Chat with the Knowledge Graph")
 
 user_input = st.text_input("Ask a question:")
-if st.button("Send"):
-    if user_input:
-        with st.chat_message("user"):
-            st.write(user_input)
-
-        with st.chat_message("assistant"):
-            response_stream = chatbot.chat(user_input)  # Call chatbot
-            response_placeholder = st.empty()  # Placeholder for streamed text
-            full_response = ""
-
-            # ✅ FIX: Remove `.text`, since Gemini response is plain text
-            for chunk in response_stream:
-                full_response += chunk  # ✅ Append chunk directly
-    
