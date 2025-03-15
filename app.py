@@ -48,16 +48,19 @@ with col1:
 
     if uploaded_file:
         if st.button("Process Document"):
-            with st.spinner("🔄 Processing document..."):
-                success = processor.process_pdf(uploaded_file)
-                
-                if success:
-                    st.success("✅ Document processed successfully!")
-                    st.session_state.chat_history.append(
-                        {"role": "system", "content": f"Document '{uploaded_file.name}' has been processed and added to the knowledge graph."}
-                    )
-                else:
-                    st.error("❌ Failed to process document. Check logs for details.")
+            try:
+                with st.spinner("🔄 Processing document..."):
+                    success = processor.process_pdf(uploaded_file)
+                    
+                    if success:
+                        st.success("✅ Document processed successfully!")
+                        st.session_state.chat_history.append(
+                            {"role": "system", "content": f"Document '{uploaded_file.name}' has been processed and added to the knowledge graph."}
+                        )
+                    else:
+                        st.error("❌ Failed to process document. See messages above for details.")
+            except Exception as e:
+                st.error(f"❌ Error processing document: {str(e)}")
 
     # Display system status
     st.subheader("System Status")
@@ -118,9 +121,6 @@ with col2:
         
         # Add assistant message to chat history
         st.session_state.chat_history.append({"role": "assistant", "content": response_text})
-        
-        # Remove the experimental_rerun() call which is causing the error
-        # The chat will update automatically without needing to rerun
 
 # Footer
 st.markdown("---")
