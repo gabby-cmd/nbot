@@ -1,84 +1,57 @@
-import google.generativeai as genai
 from neo4j import GraphDatabase
+import google.generativeai as genai
 import json
-import streamlit as st
 
-# ✅ Configure Gemini API
-genai.configure(api_key=st.secrets["gemini"]["api_key"])
+# ✅ Configure Gemini LLM API Key
+genai.configure(api_key="your-gemini-api-key")
 
 class Chatbot:
-    def __init__(self):
-        """Initialize Neo4j connection"""
-        self.uri = st.secrets["neo4j"]["uri"]
-        self.user = st.secrets["neo4j"]["user"]
-        self.password = st.secrets["neo4j"]["password"]
-        self.driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))
+    def __init__(self, uri: str, user: str, password: str, database: str = "neo4j"):
+        """✅ Initialize Neo4j connection"""
+        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+        self.database = database
 
-        # ✅ Verify Connection
-        try:
-            with self.driver.session() as session:
-                session.run("RETURN 1")  # Simple test query
-            print("✅ Connected to Neo4j successfully!")
-        except Exception as e:
-            print(f"🚨 Failed to connect to Neo4j: {e}")
+    def close(self):
+        """✅ Close Neo4j connection"""
+        self.driver.close()
 
     def chat(self, user_input: str):
-        """Process user query, retrieve knowledge from Neo4j, and generate chatbot response"""
-        try:
-            print(f"📝 User Input: {user_input}")  # ✅ Debug: Print user query
-            entities = self._find_relevant_entities(user_input)
-            relationships = self._find_relevant_relationships(user_input)
+        """✅ Process user query, retrieve knowledge from Neo4j, and generate chatbot response"""
+        entities = self._find_relevant_entities(user_input)
+        relationships = self._find_relevant_relationships(user_input)
 
-            print(f"🔍 Found Entities: {entities}")  # ✅ Debug: Print entities
-            print(f"🔗 Found Relationships: {relationships}")  # ✅ Debug: Print relationships
+        structured_data = {
+            "query": user_input,
+            "entities": entities,
+            "relationships": relationships
+        }
 
-            structured_data = {
-                "query": user_input,
-                "entities": entities,
-                "relationships": relationships
-            }
-
-            if not entities and not relationships:
-                return ["⚠️ No relevant information found in the knowledge graph. Try another query."]
-
-            return self._generate_gemini_response(user_input, structured_data)
-
-        except Exception as e:
-            print(f"🚨 Error in chatbot processing: {e}")
-            return [f"🚨 Error: {str(e)}"]  # Return an error message for debugging
+        return self._generate_gemini_response(user_input, structured_data)
 
     def _find_relevant_entities(self, query_text: str):
-        """Find relevant entities from Neo4j"""
+        """✅ Find relevant entities from Neo4j"""
         query = """
-        MATCH (e:Entity)
-        WHERE toLower(e.name) CONTAINS toLower($query)
-        RETURN e.name AS name, e.type AS type
+        MATCH (e:TextChunk)
+        WHERE toLower(e.text) CONTAINS toLower($query)
+        RETURN e.text AS text
         """
         with self.driver.session() as session:
-            try:
-                results = session.run(query, query=query_text)
-                return [{"name": record["name"], "type": record["type"]} for record in results]
-            except Exception as e:
-                print(f"🚨 Neo4j query error (entities): {e}")
-                return []
+            results = session.run(query, query=query_text)
+            return [{"text": record["text"]} for record in results]
 
     def _find_relevant_relationships(self, query_text: str):
-        """Find relationships in Neo4j"""
+        """✅ Find relationships in Neo4j"""
         query = """
-        MATCH (a:Entity)-[r]->(b:Entity)
-        WHERE toLower(a.name) CONTAINS toLower($query) OR toLower(b.name) CONTAINS toLower($query)
-        RETURN a.name AS source, type(r) AS relationship, b.name AS target
+        MATCH (a:TextChunk)-[r]->(b:TextChunk)
+        WHERE toLower(a.text) CONTAINS toLower($query) OR toLower(b.text) CONTAINS toLower($query)
+        RETURN a.text AS source, type(r) AS relationship, b.text AS target
         """
         with self.driver.session() as session:
-            try:
-                results = session.run(query, query=query_text)
-                return [{"source": record["source"], "relationship": record["relationship"], "target": record["target"]} for record in results]
-            except Exception as e:
-                print(f"🚨 Neo4j query error (relationships): {e}")
-                return []
+            results = session.run(query, query=query_text)
+            return [{"source": record["source"], "relationship": record["relationship"], "target": record["target"]} for record in results]
 
     def _generate_gemini_response(self, user_input: str, structured_data):
-        """Generate chatbot response using Gemini LLM with streaming"""
+        """✅ Generate chatbot response using Gemini LLM"""
         prompt = f"""
         You are a chatbot that answers user queries based on structured knowledge.
 
@@ -91,10 +64,6 @@ class Chatbot:
         """
 
         model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt)  # ✅ Use `generate_content` (not streaming)
-        
-        if response and response.candidates:
-            return [response.candidates[0].content]  # ✅ Extract plain text
-        else:
-            return ["⚠️ No response generated from Gemini."]
+        response_stream = model.generate_content_stream(prompt)
 
+        return response_stream  # ✅ Returns a streaming generator
