@@ -1,8 +1,15 @@
 import streamlit as st
 from query_engine import Chatbot
+from document_processor import DocumentProcessor
 
-# ✅ Initialize chatbot without parameters
-chatbot = Chatbot()
+# ✅ Load secrets from Streamlit
+NEO4J_URI = st.secrets["neo4j"]["uri"]
+NEO4J_USER = st.secrets["neo4j"]["user"]
+NEO4J_PASSWORD = st.secrets["neo4j"]["password"]
+
+# ✅ Initialize chatbot & document processor
+chatbot = Chatbot(uri=NEO4J_URI, user=NEO4J_USER, password=NEO4J_PASSWORD)
+processor = DocumentProcessor(uri=NEO4J_URI, user=NEO4J_USER, password=NEO4J_PASSWORD)
 
 st.title("Knowledge Graph Chatbot")
 
@@ -11,10 +18,6 @@ st.subheader("📂 Upload a Document to Add to Knowledge Graph")
 uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
 
 if uploaded_file:
-    from document_processor import DocumentProcessor
-
-    processor = DocumentProcessor()
-    
     with st.spinner("🔄 Processing file..."):
         processor.process_pdf(uploaded_file)
 
