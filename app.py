@@ -2,41 +2,41 @@ import streamlit as st
 from query_engine import Chatbot
 from document_processor import DocumentProcessor
 
-# ✅ Load Neo4j credentials securely from Streamlit secrets
+# ✅ Load Neo4j credentials from Streamlit secrets
 URI = st.secrets["neo4j"]["uri"]
 USER = st.secrets["neo4j"]["user"]
 PASSWORD = st.secrets["neo4j"]["password"]
 
-# Initialize document processor with Neo4j credentials
+# ✅ Initialize Neo4j document processor
 processor = DocumentProcessor(uri=URI, user=USER, password=PASSWORD)
 
-# Initialize chatbot
+# ✅ Initialize chatbot
 chatbot = Chatbot()
 
-st.title(" Knowledge Graph Chatbot")
+st.title("📚 Knowledge Graph Chatbot")
 
-### ** Upload and Process Documents**
-st.sidebar.header(" Upload a Document")
-uploaded_file = st.sidebar.file_uploader("Upload a document", type=["pdf", "txt", "docx"])
+### **🔹 Upload and Process Documents**
+st.sidebar.header("📂 Upload a Document")
+uploaded_file = st.sidebar.file_uploader("Upload a PDF document", type=["pdf"])
 
 if uploaded_file:
-    with st.spinner("Processing document"):
+    with st.spinner("Processing document... ⏳"):
         try:
-            # Process document with Neo4j storage
-            text_chunks, entities, relationships = processor.process_document(uploaded_file)
-            
-            # 🔍 Show extracted data for debugging
-            st.sidebar.subheader("Extracted Data")
-            st.sidebar.write("Text Chunks:", text_chunks)
-            st.sidebar.write("Entities:", entities)
-            st.sidebar.write("Relationships:", relationships)
+            # ✅ Save uploaded file locally
+            file_path = os.path.join("uploads", uploaded_file.name)
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
 
-            st.sidebar.success("Document processed and stored in Neo4j!")
+            # ✅ Process PDF and store chunks in Neo4j
+            processor.process_pdf(file_path)
+
+            st.sidebar.success("✅ Document processed and stored in Neo4j!")
+
         except Exception as e:
-            st.error(f"Error processing document: {e}")
+            st.error(f"🚨 Error processing document: {e}")
 
-### **Chatbot Interface**
-st.header("Chat with the Knowledge Graph")
+### **🔹 Chatbot Interface**
+st.header("🤖 Chat with the Knowledge Graph")
 
 user_input = st.text_input("Ask a question:")
 if st.button("Send"):
