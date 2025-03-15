@@ -1,18 +1,18 @@
 import google.generativeai as genai
 from neo4j import GraphDatabase
-import streamlit as st  # ✅ Import Streamlit for Secrets
+import streamlit as st  # Import Streamlit for Secrets
 
-# ✅ Load API keys from Streamlit Secrets
+# Load API keys from Streamlit Secrets
 genai.configure(api_key=st.secrets["gemini"]["api_key"])
 
-# ✅ Load Neo4j credentials from Streamlit Secrets
+# Load Neo4j credentials from Streamlit Secrets
 URI = st.secrets["neo4j"]["uri"]
 AUTH = (st.secrets["neo4j"]["user"], st.secrets["neo4j"]["password"])
 
-# ✅ Verify Neo4j Connection
+# Verify Neo4j Connection
 with GraphDatabase.driver(URI, auth=AUTH) as driver:
     driver.verify_connectivity()
-    print("✅ Connected to Neo4j successfully!")
+    print("Connected to Neo4j successfully!")
 
 class Chatbot:
     def __init__(self):
@@ -75,4 +75,4 @@ class Chatbot:
         model = genai.GenerativeModel("gemini-1.5-flash")
         response_stream = model.generate_content_stream(prompt)
 
-        return response_stream  # ✅ Streams response in real-time
+        return response_stream  #  Streams response in real-time
