@@ -3,6 +3,7 @@ from neo4j import GraphDatabase
 import json
 import google.generativeai as genai
 import time
+import re
 
 class Chatbot:
     def __init__(self, uri, user, password, database="neo4j"):
@@ -33,29 +34,60 @@ class Chatbot:
         """Process user query, retrieve knowledge from Neo4j, and generate chatbot response"""
         if not user_input or user_input.strip() == "":
             return "Please ask a question."
+        
+        # Debug info
+        st.info(f"Searching for information about: '{user_input}'")
+        
+        # Check if database has any content
+        db_has_content = self._check_database_has_content()
+        if not db_has_content:
+            return "The knowledge base appears to be empty. Please upload a document first."
             
         # First try exact keyword search
         text_chunks = self._find_relevant_text_exact(user_input)
+        if text_chunks:
+            st.info(f"Found {len(text_chunks)} chunks with exact match")
         
         # If no results, try fuzzy search with individual keywords
         if not text_chunks:
-            print("🔍 No exact matches found, trying keyword search...")
+            st.info("No exact matches found, trying keyword search...")
             text_chunks = self._find_relevant_text_keywords(user_input)
+            if text_chunks:
+                st.info(f"Found {len(text_chunks)} chunks with keyword search")
+            
+        # If still no results, try searching for acronyms or abbreviations
+        if not text_chunks and len(user_input) <= 5:
+            st.info("Trying acronym/abbreviation search...")
+            text_chunks = self._find_text_with_acronym(user_input)
+            if text_chunks:
+                st.info(f"Found {len(text_chunks)} chunks with acronym search")
             
         # If still no results, get some random chunks as context
         if not text_chunks:
-            print("🔍 No keyword matches found, retrieving sample chunks...")
+            st.info("No specific matches found, retrieving sample chunks...")
             text_chunks = self._get_sample_chunks()
-        
-        print(f"📚 Found {len(text_chunks)} relevant chunks")
+            if text_chunks:
+                st.info(f"Retrieved {len(text_chunks)} sample chunks")
         
         # Generate response using Gemini
         try:
             response = self._generate_gemini_response(user_input, text_chunks)
             return response
         except Exception as e:
-            print(f"❌ Error generating response: {e}")
+            st.error(f"Error generating response: {str(e)}")
             return f"⚠️ Error generating response: {str(e)}"
+
+    def _check_database_has_content(self):
+        """Check if the database has any content"""
+        try:
+            with self.driver.session() as session:
+                result = session.run("MATCH (c:TextChunk) RETURN count(c) as count").single()
+                count = result["count"] if result else 0
+                st.info(f"Found {count} chunks in the database")
+                return count > 0
+        except Exception as e:
+            st.error(f"Error checking database content: {str(e)}")
+            return False
 
     def _find_relevant_text_exact(self, query_text):
         """Retrieve relevant text chunks from Neo4j using exact match"""
@@ -65,19 +97,31 @@ class Chatbot:
                     """
                     MATCH (c:TextChunk)
                     WHERE toLower(c.text) CONTAINS toLower($query_text)
-                    RETURN c.text AS text
+                    RETURN c.text AS text, c.id AS id
                     LIMIT 5
                     """,
                     query_text=query_text
                 )
-                return [record["text"] for record in results]
+                chunks = []
+                for record in results:
+                    chunks.append(record["text"])
+                    st.info(f"Found match in chunk {record['id']}")
+                return chunks
         except Exception as e:
-            print(f"❌ Error querying Neo4j: {e}")
+            st.error(f"Error querying Neo4j: {str(e)}")
             return []
 
     def _find_relevant_text_keywords(self, query_text):
         """Retrieve relevant text chunks from Neo4j using keywords"""
+        # Extract meaningful keywords (words longer than 3 characters)
         keywords = [word.strip().lower() for word in query_text.split() if len(word.strip()) > 3]
+        
+        # If no meaningful keywords, use all words
+        if not keywords:
+            keywords = [word.strip().lower() for word in query_text.split() if len(word.strip()) > 0]
+            
+        st.info(f"Searching with keywords: {keywords}")
+        
         results = []
         
         try:
@@ -87,36 +131,95 @@ class Chatbot:
                         """
                         MATCH (c:TextChunk)
                         WHERE toLower(c.text) CONTAINS toLower($keyword)
-                        RETURN c.text AS text
+                        RETURN c.text AS text, c.id AS id
                         LIMIT 3
                         """,
                         keyword=keyword
                     )
                     for record in query_results:
                         if record["text"] not in results:
+                            st.info(f"Found keyword '{keyword}' in chunk {record['id']}")
                             results.append(record["text"])
                             if len(results) >= 5:  # Limit to 5 chunks
                                 return results
                 return results
         except Exception as e:
-            print(f"❌ Error querying Neo4j with keywords: {e}")
+            st.error(f"Error querying Neo4j with keywords: {str(e)}")
             return []
 
-    def _get_sample_chunks(self, limit=3):
+    def _find_text_with_acronym(self, acronym):
+        """Search for text chunks that might contain the expanded form of an acronym"""
+        try:
+            with self.driver.session() as session:
+                # First try to find exact acronym
+                results = session.run(
+                    """
+                    MATCH (c:TextChunk)
+                    WHERE toLower(c.text) CONTAINS toLower($acronym)
+                    RETURN c.text AS text, c.id AS id
+                    LIMIT 5
+                    """,
+                    acronym=acronym
+                )
+                
+                chunks = []
+                for record in results:
+                    st.info(f"Found acronym '{acronym}' in chunk {record['id']}")
+                    chunks.append(record["text"])
+                
+                # If found, return these chunks
+                if chunks:
+                    return chunks
+                    
+                # If not found, get all chunks to search for potential matches
+                # (This is inefficient but works for small datasets)
+                all_results = session.run(
+                    """
+                    MATCH (c:TextChunk)
+                    RETURN c.text AS text, c.id AS id
+                    LIMIT 20
+                    """
+                )
+                
+                # Look for patterns where the acronym might be defined
+                # e.g., "All Star Driver Education (ASDE)"
+                chunks = []
+                pattern1 = re.compile(r'([A-Za-z\s]+)\s*$$' + re.escape(acronym) + r'$$', re.IGNORECASE)
+                pattern2 = re.compile(r'([A-Za-z\s]+)\s*$$' + ''.join([f'{c}[A-Za-z]*' for c in acronym]) + r'$$', re.IGNORECASE)
+                
+                for record in all_results:
+                    text = record["text"]
+                    if pattern1.search(text) or pattern2.search(text) or acronym.lower() in text.lower():
+                        st.info(f"Found potential acronym match in chunk {record['id']}")
+                        chunks.append(text)
+                        if len(chunks) >= 5:
+                            break
+                
+                return chunks
+                
+        except Exception as e:
+            st.error(f"Error searching for acronym: {str(e)}")
+            return []
+
+    def _get_sample_chunks(self, limit=5):
         """Get sample chunks from Neo4j when no relevant chunks are found"""
         try:
             with self.driver.session() as session:
                 results = session.run(
                     """
                     MATCH (c:TextChunk)
-                    RETURN c.text AS text
+                    RETURN c.text AS text, c.id AS id
                     LIMIT $limit
                     """,
                     limit=limit
                 )
-                return [record["text"] for record in results]
+                chunks = []
+                for record in results:
+                    st.info(f"Retrieved sample chunk {record['id']}")
+                    chunks.append(record["text"])
+                return chunks
         except Exception as e:
-            print(f"❌ Error getting sample chunks: {e}")
+            st.error(f"Error getting sample chunks: {str(e)}")
             return []
 
     def _generate_gemini_response(self, user_input, text_chunks):
@@ -189,15 +292,15 @@ class Chatbot:
                     if response and hasattr(response, "text"):
                         return response.text
                     else:
-                        print(f"⚠️ Empty response from Gemini (attempt {attempt+1})")
+                        st.warning(f"Empty response from Gemini (attempt {attempt+1})")
                         time.sleep(1)  # Wait before retry
                 except Exception as e:
-                    print(f"⚠️ Gemini API error (attempt {attempt+1}): {str(e)}")
+                    st.warning(f"Gemini API error (attempt {attempt+1}): {str(e)}")
                     time.sleep(2)  # Wait before retry
                     
             # Fallback response if all retries fail
             return "I'm having trouble connecting to my knowledge base. Please try a different question or try again later."
         except Exception as e:
-            print(f"❌ Error with Gemini API: {str(e)}")
+            st.error(f"Error with Gemini API: {str(e)}")
             return "I encountered a technical issue. Please check your API configuration and try again."
 
