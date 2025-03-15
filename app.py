@@ -70,6 +70,14 @@ with col1:
                 result = session.run("RETURN 1 as test").single()
                 if result and result["test"] == 1:
                     st.success("✅ Connected to Neo4j")
+                    
+                    # Check if database has content
+                    count_result = session.run("MATCH (c:TextChunk) RETURN count(c) as count").single()
+                    count = count_result["count"] if count_result else 0
+                    if count > 0:
+                        st.success(f"✅ Database contains {count} text chunks")
+                    else:
+                        st.warning("⚠️ Database is empty. Please upload a document.")
                 else:
                     st.error("❌ Neo4j connection issue")
     except Exception as e:
