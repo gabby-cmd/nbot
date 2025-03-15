@@ -1,15 +1,13 @@
 import google.generativeai as genai
 from neo4j import GraphDatabase
+import streamlit as st
 import json
-import os
-import streamlit as st  # ✅ Import Streamlit to access secrets
 
-# ✅ Load Gemini API Key securely
-GEMINI_API_KEY = st.secrets["gemini"]["api_key"]
-genai.configure(api_key=GEMINI_API_KEY)
+# Configure Gemini API
+genai.configure(api_key=st.secrets["gemini"]["api_key"])
 
 class Chatbot:
-    def __init__(self, uri: str, user: str, password: str, database: str = "neo4j"):
+    def __init__(self, uri, user, password, database="neo4j"):
         """Initialize Neo4j connection"""
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
         self.database = database
@@ -18,8 +16,8 @@ class Chatbot:
         """Close Neo4j connection"""
         self.driver.close()
 
-    def chat(self, user_input: str):
-        """Process user query, retrieve knowledge from Neo4j, and generate chatbot response"""
+    def chat(self, user_input):
+        """Retrieve relevant data and generate chatbot response"""
         text_chunks = self._find_relevant_text(user_input)
 
         if not text_chunks:
@@ -32,31 +30,36 @@ class Chatbot:
 
         return self._generate_gemini_response(user_input, structured_data)
 
-    def _find_relevant_text(self, query_text: str):
-        """Retrieve relevant document chunks from Neo4j"""
+    def _find_relevant_text(self, query_text):
+        """Find relevant text chunks from Neo4j"""
         query = """
         MATCH (c:TextChunk)
-        WHERE toLower(c.text) CONTAINS toLower($query)
+        WHERE toLower(c.text) CONTAINS toLower($query_text)
         RETURN c.text AS text
         """
-        with self.driver.session() as session:
-            results = session.run(query, query=query_text)
-            return [record["text"] for record in results]
 
-    def _generate_gemini_response(self, user_input: str, structured_data):
+        with self.driver.session() as session:
+            try:
+                results = session.run(query, {"query_text": query_text})  # ✅ Fixed query syntax
+                return [record["text"] for record in results]
+            except Exception as e:
+                print(f"❌ Query Execution Failed: {e}")
+                return []
+
+    def _generate_gemini_response(self, user_input, structured_data):
         """Generate chatbot response using Gemini LLM"""
         prompt = f"""
-        You are an AI assistant that answers user queries based on structured knowledge.
+        You are a chatbot that answers user queries based on structured knowledge.
 
         User's Query: {user_input}
 
-        Relevant Text Chunks from Knowledge Graph:
+        Knowledge Graph Data:
         {json.dumps(structured_data, indent=2)}
 
         Provide a conversational, user-friendly response explaining the answer in simple terms.
         """
 
         model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt)
+        response_stream = model.generate_content_stream(prompt)  # ✅ Streams response
 
-        return response.text.split("\n")  # ✅ Return formatted response
+        return response_stream  # ✅ Returns a streaming generator
