@@ -2,9 +2,11 @@ import google.generativeai as genai
 from neo4j import GraphDatabase
 import json
 import os
+import streamlit as st  # ✅ Import Streamlit to access secrets
 
-# Configure Gemini API
-genai.configure(api_key=st.secrets["gemini"]["api_key"])
+# ✅ Load Gemini API Key securely
+GEMINI_API_KEY = st.secrets["gemini"]["api_key"]
+genai.configure(api_key=GEMINI_API_KEY)
 
 class Chatbot:
     def __init__(self, uri: str, user: str, password: str, database: str = "neo4j"):
