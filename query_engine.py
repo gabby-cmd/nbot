@@ -22,21 +22,24 @@ class Chatbot:
         except Exception as e:
             print(f"🚨 Failed to connect to Neo4j: {e}")
 
-    def close(self):
-        """Close Neo4j connection"""
-        self.driver.close()
-
     def chat(self, user_input: str):
         """Process user query, retrieve knowledge from Neo4j, and generate chatbot response"""
         try:
+            print(f"📝 User Input: {user_input}")  # ✅ Debug: Print user query
             entities = self._find_relevant_entities(user_input)
             relationships = self._find_relevant_relationships(user_input)
+
+            print(f"🔍 Found Entities: {entities}")  # ✅ Debug: Print entities
+            print(f"🔗 Found Relationships: {relationships}")  # ✅ Debug: Print relationships
 
             structured_data = {
                 "query": user_input,
                 "entities": entities,
                 "relationships": relationships
             }
+
+            if not entities and not relationships:
+                return ["⚠️ No relevant information found in the knowledge graph. Try another query."]
 
             return self._generate_gemini_response(user_input, structured_data)
 
@@ -88,6 +91,10 @@ class Chatbot:
         """
 
         model = genai.GenerativeModel("gemini-1.5-flash")
-        response_stream = model.generate_content_stream(prompt)  # ✅ Streams response
+        response = model.generate_content(prompt)  # ✅ Use `generate_content` (not streaming)
+        
+        if response and response.candidates:
+            return [response.candidates[0].content]  # ✅ Extract plain text
+        else:
+            return ["⚠️ No response generated from Gemini."]
 
-        return response_stream  # ✅ Returns a streaming generator
