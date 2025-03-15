@@ -43,3 +43,20 @@ if uploaded_file:
 st.header("🤖 Chat with the Knowledge Graph")
 
 user_input = st.text_input("Ask a question:")
+if st.button("Send"):
+    if user_input:
+        with st.chat_message("user"):
+            st.write(user_input)
+
+        with st.chat_message("assistant"):
+            response_stream = chatbot.chat(user_input)  # ✅ Call chatbot
+            response_placeholder = st.empty()  # ✅ Placeholder for streamed text
+            full_response = ""
+
+            # ✅ FIX: Directly append text chunks (no `.text` attribute)
+            for chunk in response_stream:
+                if isinstance(chunk, str):  # ✅ Ensure chunk is a string
+                    full_response += chunk  
+                    response_placeholder.write(full_response)  # ✅ Update UI dynamically
+                else:
+                    print(f"Unexpected chunk format: {chunk}")
