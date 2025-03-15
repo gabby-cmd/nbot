@@ -1,4 +1,5 @@
 import streamlit as st
+import os  # ✅ Fix: Import os module
 from query_engine import Chatbot
 from document_processor import DocumentProcessor
 
@@ -7,7 +8,7 @@ URI = st.secrets["neo4j"]["uri"]
 USER = st.secrets["neo4j"]["user"]
 PASSWORD = st.secrets["neo4j"]["password"]
 
-# ✅ Initialize Neo4j document processor
+# ✅ Initialize document processor
 processor = DocumentProcessor(uri=URI, user=USER, password=PASSWORD)
 
 # ✅ Initialize chatbot
@@ -22,6 +23,9 @@ uploaded_file = st.sidebar.file_uploader("Upload a PDF document", type=["pdf"])
 if uploaded_file:
     with st.spinner("Processing document... ⏳"):
         try:
+            # ✅ Ensure 'uploads' folder exists
+            os.makedirs("uploads", exist_ok=True)
+
             # ✅ Save uploaded file locally
             file_path = os.path.join("uploads", uploaded_file.name)
             with open(file_path, "wb") as f:
