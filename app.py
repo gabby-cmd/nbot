@@ -99,17 +99,22 @@ with col2:
         
         # Get and display assistant response
         with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                start_time = time.time()
-                response_text = chatbot.chat(user_input)
-                end_time = time.time()
-                
+            try:
+                with st.spinner("Thinking..."):
+                    start_time = time.time()
+                    response_text = chatbot.chat(user_input)
+                    end_time = time.time()
+                    
+                    st.write(response_text)
+                    
+                    # Add debug info if response took too long
+                    response_time = end_time - start_time
+                    if response_time > 5:
+                        st.caption(f"Response time: {response_time:.2f} seconds")
+            except Exception as e:
+                st.error(f"Error generating response: {str(e)}")
+                response_text = "I encountered a technical issue. Please try again later."
                 st.write(response_text)
-                
-                # Add debug info if response took too long
-                response_time = end_time - start_time
-                if response_time > 5:
-                    st.caption(f"Response time: {response_time:.2f} seconds")
         
         # Add assistant message to chat history
         st.session_state.chat_history.append({"role": "assistant", "content": response_text})
