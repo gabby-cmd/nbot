@@ -1,12 +1,17 @@
 import streamlit as st
 from query_engine import Chatbot
-from document_processor import DocumentProcessor
 
-# Initialize chatbot
+#  Import DocumentProcessor correctly
+try:
+    from document_processor import DocumentProcessor
+    processor = DocumentProcessor()  #  Initialize processor
+except ImportError as e:
+    st.error(f"Failed to import DocumentProcessor: {e}")
+
+#  Initialize chatbot
 chatbot = Chatbot()
-processor = DocumentProcessor()
 
-st.title("📚 Knowledge Graph Chatbot")
+st.title("Knowledge Graph Chatbot")
 
 ### **🔹 Upload and Process Documents**
 st.sidebar.header("📂 Upload a Document")
@@ -14,8 +19,19 @@ uploaded_file = st.sidebar.file_uploader("Upload a document", type=["pdf", "txt"
 
 if uploaded_file:
     with st.spinner("Processing document... ⏳"):
-        processor.process_document(uploaded_file)
-        st.sidebar.success("✅ Document processed and stored in Neo4j!")
+        try:
+            #  Process document safely
+            text_chunks, entities, relationships = processor.process_document(uploaded_file)
+            
+            # 🔍 Show extracted data for debugging
+            st.sidebar.subheader("Extracted Data")
+            st.sidebar.write("Text Chunks:", text_chunks)
+            st.sidebar.write("Entities:", entities)
+            st.sidebar.write("Relationships:", relationships)
+
+            st.sidebar.success("Document processed and stored in Neo4j!")
+        except Exception as e:
+            st.error(f" Error processing document: {e}")
 
 ### **🔹 Chatbot Interface**
 st.header("🤖 Chat with the Knowledge Graph")
