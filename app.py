@@ -53,6 +53,7 @@ if st.button("Send"):
             response_placeholder = st.empty()  # Placeholder for streamed text
             full_response = ""
 
+            # ✅ FIX: Remove `.text`, since Gemini response is plain text
             for chunk in response_stream:
-                full_response += chunk.text  # Append streamed text
-                response_placeholder.write(full_response)  # Update UI dynamically
+                full_response += chunk  # ✅ Append chunk directly
+    
