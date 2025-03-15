@@ -25,54 +25,17 @@ class Chatbot:
     def chat(self, user_input: str):
         """Process user query, retrieve knowledge from Neo4j, and generate chatbot response"""
         text_chunks = self._find_relevant_text(user_input)
-        entities = self._find_relevant_entities(user_input)
-        relationships = self._find_relevant_relationships(user_input)
 
         structured_data = {
             "query": user_input,
-            "entities": entities,
-            "relationships": relationships,
             "text_chunks": text_chunks
         }
 
         # If no relevant information is found
-        if not text_chunks and not entities and not relationships:
+        if not text_chunks:
             return "⚠️ No relevant information found in the knowledge graph. Try another query."
 
         return self._generate_gemini_response(user_input, structured_data)
-
-    def _find_relevant_entities(self, query_text: str):
-        """Find relevant entities from Neo4j"""
-        query = """
-        MATCH (e:Entity)
-        WHERE toLower(e.name) CONTAINS toLower($query_text)
-        RETURN e.name AS name, e.type AS type
-        """
-        try:
-            with self.driver.session() as session:
-                results = session.run(query, {"query_text": query_text})
-                return [{"name": record["name"], "type": record["type"]} for record in results]
-        except Exception as e:
-            print(f"⚠️ Neo4j Entity Query Error: {e}")
-            return []
-
-    def _find_relevant_relationships(self, query_text: str):
-        """Find relationships in Neo4j"""
-        query = """
-        MATCH (a:Entity)-[r]->(b:Entity)
-        WHERE toLower(a.name) CONTAINS toLower($query_text) OR toLower(b.name) CONTAINS toLower($query_text)
-        RETURN a.name AS source, type(r) AS relationship, b.name AS target
-        """
-        try:
-            with self.driver.session() as session:
-                results = session.run(query, {"query_text": query_text})
-                return [
-                    {"source": record["source"], "relationship": record["relationship"], "target": record["target"]}
-                    for record in results
-                ]
-        except Exception as e:
-            print(f"⚠️ Neo4j Relationship Query Error: {e}")
-            return []
 
     def _find_relevant_text(self, query_text: str):
         """Find relevant text chunks from Neo4j"""
